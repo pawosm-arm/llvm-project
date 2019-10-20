@@ -282,6 +282,7 @@ public:
                                      LLT Ty);
   LegalizeResult narrowScalarInsert(MachineInstr &MI, unsigned TypeIdx, LLT Ty);
 
+  LegalizeResult narrowScalarUnary(MachineInstr &MI, unsigned TypeIdx, LLT Ty);
   LegalizeResult narrowScalarBasic(MachineInstr &MI, unsigned TypeIdx, LLT Ty);
   LegalizeResult narrowScalarExtended(MachineInstr &MI, unsigned TypeIdx,
                                       LLT Ty);
