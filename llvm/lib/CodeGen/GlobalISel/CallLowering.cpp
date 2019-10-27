@@ -64,6 +64,7 @@ bool CallLowering::lowerCall(MachineIRBuilder &MIRBuilder, const CallBase &CB,
     setArgFlags(Info.OrigRet, AttributeList::ReturnIndex, DL, CB);
 
   MachineFunction &MF = MIRBuilder.getMF();
+  Info.CallAttributes = CB.getAttributes();
   Info.KnownCallees = CB.getMetadata(LLVMContext::MD_callees);
   Info.CallConv = CB.getCallingConv();
   Info.SwiftErrorVReg = SwiftErrorVReg;
