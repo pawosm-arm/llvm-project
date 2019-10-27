@@ -372,7 +372,8 @@ bool AArch64CallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
     }
 
     OutgoingArgHandler Handler(MIRBuilder, MRI, MIB, AssignFn, AssignFn);
-    Success = handleAssignments(MIRBuilder, SplitArgs, Handler);
+    Success =
+        handleAssignments(CC, F.isVarArg(), MIRBuilder, SplitArgs, Handler);
   }
 
   if (SwiftErrorVReg) {
@@ -459,7 +460,8 @@ bool AArch64CallLowering::lowerFormalArguments(
       TLI.CCAssignFnForCall(F.getCallingConv(), /*IsVarArg=*/false);
 
   FormalArgHandler Handler(MIRBuilder, MRI, AssignFn);
-  if (!handleAssignments(MIRBuilder, SplitArgs, Handler))
+  if (!handleAssignments(F.getCallingConv(), F.isVarArg(), MIRBuilder,
+                         SplitArgs, Handler))
     return false;
 
   AArch64FunctionInfo *FuncInfo = MF.getInfo<AArch64FunctionInfo>();
@@ -883,7 +885,7 @@ bool AArch64CallLowering::lowerTailCall(
   SmallVector<unsigned, 8> PhysRegs;
   OutgoingArgHandler Handler(MIRBuilder, MRI, MIB, AssignFnFixed,
                              AssignFnVarArg, true, FPDiff);
-  if (!handleAssignments(MIRBuilder, OutArgs, Handler))
+  if (!handleAssignments(CalleeCC, Info.IsVarArg, MIRBuilder, OutArgs, Handler))
     return false;
 
   if (Info.IsVarArg && Info.IsMustTailCall) {
@@ -1001,7 +1003,8 @@ bool AArch64CallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
   SmallVector<unsigned, 8> PhysRegs;
   OutgoingArgHandler Handler(MIRBuilder, MRI, MIB, AssignFnFixed,
                              AssignFnVarArg, false);
-  if (!handleAssignments(MIRBuilder, OutArgs, Handler))
+  if (!handleAssignments(Info.CallConv, Info.IsVarArg, MIRBuilder, OutArgs,
+                         Handler))
     return false;
 
   // Now we can add the actual call instruction to the correct basic block.
@@ -1022,7 +1025,8 @@ bool AArch64CallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
   if (!Info.OrigRet.Ty->isVoidTy()) {
     CCAssignFn *RetAssignFn = TLI.CCAssignFnForReturn(Info.CallConv);
     CallReturnHandler Handler(MIRBuilder, MRI, MIB, RetAssignFn);
-    if (!handleAssignments(MIRBuilder, InArgs, Handler))
+    if (!handleAssignments(Info.CallConv, Info.IsVarArg, MIRBuilder, InArgs,
+                           Handler))
       return false;
   }
 

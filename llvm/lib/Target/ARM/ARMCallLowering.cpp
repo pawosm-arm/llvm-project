@@ -259,7 +259,8 @@ bool ARMCallLowering::lowerReturnVal(MachineIRBuilder &MIRBuilder,
       TLI.CCAssignFnForReturn(F.getCallingConv(), F.isVarArg());
 
   OutgoingValueHandler RetHandler(MIRBuilder, MF.getRegInfo(), Ret, AssignFn);
-  return handleAssignments(MIRBuilder, SplitRetInfos, RetHandler);
+  return handleAssignments(F.getCallingConv(), F.isVarArg(), MIRBuilder,
+                           SplitRetInfos, RetHandler);
 }
 
 bool ARMCallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
@@ -459,7 +460,8 @@ bool ARMCallLowering::lowerFormalArguments(
   if (!MBB.empty())
     MIRBuilder.setInstr(*MBB.begin());
 
-  if (!handleAssignments(MIRBuilder, SplitArgInfos, ArgHandler))
+  if (!handleAssignments(F.getCallingConv(), F.isVarArg(), MIRBuilder,
+                         SplitArgInfos, ArgHandler))
     return false;
 
   // Move back to the end of the basic block.
@@ -555,7 +557,8 @@ bool ARMCallLowering::lowerCall(MachineIRBuilder &MIRBuilder, CallLoweringInfo &
 
   auto ArgAssignFn = TLI.CCAssignFnForCall(Info.CallConv, IsVarArg);
   OutgoingValueHandler ArgHandler(MIRBuilder, MRI, MIB, ArgAssignFn);
-  if (!handleAssignments(MIRBuilder, ArgInfos, ArgHandler))
+  if (!handleAssignments(Info.CallConv, Info.IsVarArg, MIRBuilder, ArgInfos,
+                         ArgHandler))
     return false;
 
   // Now we can add the actual call instruction to the correct basic block.
@@ -569,7 +572,8 @@ bool ARMCallLowering::lowerCall(MachineIRBuilder &MIRBuilder, CallLoweringInfo &
     splitToValueTypes(Info.OrigRet, ArgInfos, MF);
     auto RetAssignFn = TLI.CCAssignFnForReturn(Info.CallConv, IsVarArg);
     CallReturnHandler RetHandler(MIRBuilder, MRI, MIB, RetAssignFn);
-    if (!handleAssignments(MIRBuilder, ArgInfos, RetHandler))
+    if (!handleAssignments(Info.CallConv, Info.IsVarArg, MIRBuilder, ArgInfos,
+                           RetHandler))
       return false;
   }
 
