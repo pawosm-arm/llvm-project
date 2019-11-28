@@ -483,6 +483,8 @@ static RTLIB::Libcall getRTLibDesc(unsigned Opcode, unsigned Size) {
     RTLIBCASE(RINT_F);
   case TargetOpcode::G_FNEARBYINT:
     RTLIBCASE(NEARBYINT_F);
+  case TargetOpcode::G_FCOPYSIGN:
+    RTLIBCASE(COPYSIGN_F);
   case TargetOpcode::G_FNEG:
     RTLIBCASE(NEG_F);
   case TargetOpcode::G_FABS:
@@ -733,6 +735,7 @@ LegalizerHelper::libcall(MachineInstr &MI) {
   case TargetOpcode::G_FSQRT:
   case TargetOpcode::G_FRINT:
   case TargetOpcode::G_FNEARBYINT:
+  case TargetOpcode::G_FCOPYSIGN:
   case TargetOpcode::G_FNEG:
   case TargetOpcode::G_FABS: {
     Type *HLTy = getFloatTypeForLLT(Ctx, LLTy);

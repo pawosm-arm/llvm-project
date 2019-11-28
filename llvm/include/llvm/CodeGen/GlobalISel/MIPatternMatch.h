@@ -39,9 +39,12 @@ inline OneUse_match<SubPat> m_OneUse(const SubPat &SP) {
   return SP;
 }
 
+template <typename Int>
 struct ConstantMatch {
-  int64_t &CR;
-  ConstantMatch(int64_t &C) : CR(C) {}
+  static_assert(std::numeric_limits<Int>::is_integer,
+                "Only integral types are allowed.");
+  Int &CR;
+  ConstantMatch(Int &C) : CR(C) {}
   bool match(const MachineRegisterInfo &MRI, Register Reg) {
     if (auto MaybeCst = getConstantVRegVal(Reg, MRI)) {
       CR = *MaybeCst;
@@ -51,7 +54,8 @@ struct ConstantMatch {
   }
 };
 
-inline ConstantMatch m_ICst(int64_t &Cst) { return ConstantMatch(Cst); }
+template <typename Int>
+inline ConstantMatch<Int> m_ICst(Int &Cst) { return {Cst}; }
 
 // TODO: Rework this for different kinds of MachineOperand.
 // Currently assumes the Src for a match is a register.
@@ -234,9 +238,15 @@ m_GAnd(const LHS &L, const RHS &R) {
 }
 
 template <typename LHS, typename RHS>
-inline BinaryOp_match<LHS, RHS, TargetOpcode::G_OR, true> m_GOr(const LHS &L,
-                                                                const RHS &R) {
+inline BinaryOp_match<LHS, RHS, TargetOpcode::G_OR, true>
+m_GOr(const LHS &L, const RHS &R) {
   return BinaryOp_match<LHS, RHS, TargetOpcode::G_OR, true>(L, R);
+}
+
+template <typename LHS, typename RHS>
+inline BinaryOp_match<LHS, RHS, TargetOpcode::G_XOR, true>
+m_GXor(const LHS &L, const RHS &R) {
+  return BinaryOp_match<LHS, RHS, TargetOpcode::G_XOR, true>(L, R);
 }
 
 template <typename LHS, typename RHS>
@@ -249,6 +259,12 @@ template <typename LHS, typename RHS>
 inline BinaryOp_match<LHS, RHS, TargetOpcode::G_LSHR, false>
 m_GLShr(const LHS &L, const RHS &R) {
   return BinaryOp_match<LHS, RHS, TargetOpcode::G_LSHR, false>(L, R);
+}
+
+template <typename LHS, typename RHS>
+inline BinaryOp_match<LHS, RHS, TargetOpcode::G_ASHR, false>
+m_GAShr(const LHS &L, const RHS &R) {
+  return BinaryOp_match<LHS, RHS, TargetOpcode::G_ASHR, false>(L, R);
 }
 
 // Helper for unary instructions (G_[ZSA]EXT/G_TRUNC) etc
