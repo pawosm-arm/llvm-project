@@ -32,6 +32,7 @@ MCAsmInfoXCOFF::MCAsmInfoXCOFF() {
   COMMDirectiveAlignmentIsInBytes = false;
   LCOMMDirectiveAlignmentType = LCOMM::Log2Alignment;
   HasDotTypeDotSizeDirective = false;
+  LGloblDirective = "\t.lglobl\t";
   SymbolsHaveSMC = true;
   UseIntegratedAssembler = false;
   NeedsFunctionDescriptors = true;
