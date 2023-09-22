@@ -87,6 +87,9 @@ class DocName<string name> { string DocName = name; }
 // A brief description to show in documentation, interpreted as rST.
 class DocBrief<code descr> { code DocBrief = descr; }
 
+// A longer description to show in documentation, interpreted as rST.
+class DocFull<code descr> { code DocFull = descr; }
+
 // Indicates that this group should be flattened into its parent when generating
 // documentation.
 class DocFlatten { bit DocFlatten = 1; }
@@ -95,19 +98,22 @@ class DocFlatten { bit DocFlatten = 1; }
 // Groups
 
 def Action_Group : OptionGroup<"<action group>">, DocName<"Actions">,
-                   DocBrief<[{The action to perform on the input.}]>;
+                   HelpText<"Compiler action options">,
+                   DocBrief<[{
+Options that control what action to perform on the input.}]>;
 
 // Meta-group for options which are only used for compilation,
 // and not linking etc.
 def CompileOnly_Group : OptionGroup<"<CompileOnly group>">,
                         DocName<"Compilation options">, DocBrief<[{
-Flags controlling the behavior of Clang during compilation. These flags have
-no effect during actions that do not perform compilation.}]>;
+Options that control the behavior of the compiler during compilation.
+These options have no effect during actions that do not perform compilation.}]>;
 
 def Preprocessor_Group : OptionGroup<"<Preprocessor group>">,
                          Group<CompileOnly_Group>,
-                         DocName<"Preprocessor options">, DocBrief<[{
-Flags controlling the behavior of the Clang preprocessor.}]>;
+                         DocName<"Preprocessor options">,
+                         HelpText<"Preprocessor options">, DocBrief<[{
+Options that control the behavior of the preprocessor.}]>;
 
 def IncludePath_Group : OptionGroup<"<I/i group>">, Group<Preprocessor_Group>,
                         DocName<"Include path management">,
@@ -230,13 +236,15 @@ Flags controlling the behavior of the Clang Static Analyzer.}]>;
 
 // gfortran options that we recognize in the driver and pass along when
 // invoking GCC to compile Fortran code.
-def gfortran_Group : OptionGroup<"<gfortran group>">,
+def gfortran_Group : OptionGroup<"<gfortran group>">, Group<CompileOnly_Group>,
                      DocName<"Fortran compilation options">, DocBrief<[{
 Flags that will be passed onto the ``gfortran`` compiler when Clang is given
 a Fortran input.}]>;
 
 def Link_Group : OptionGroup<"<T/e/s/t/u group>">, DocName<"Linker options">,
-                 DocBrief<[{Flags that are passed on to the linker}]>;
+                 HelpText<"Linker options">,
+                 DocBrief<[{
+Options that are passed on to the linker or affect linking.}]>;
 def T_Group : OptionGroup<"<T group>">, Group<Link_Group>, DocFlatten;
 def u_Group : OptionGroup<"<u group>">, Group<Link_Group>, DocFlatten;
 
@@ -752,7 +760,8 @@ def _HASH_HASH_HASH : Flag<["-"], "###">, Flags<[NoXarchOption]>,
   Visibility<[ClangOption, CLOption, DXCOption, FlangOption]>,
     HelpText<"Print (but do not run) the commands to run for this compilation">;
 def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
-    Flags<[NoXarchOption]>, Visibility<[ClangOption, CLOption, DXCOption]>;
+    Flags<[NoXarchOption]>, Visibility<[ClangOption, CLOption, DXCOption]>,
+    HelpText<"All arguments after this are treated as inputs to the compiler.">;
 def A : JoinedOrSeparate<["-"], "A">, Flags<[RenderJoined]>,
   Group<gfortran_Group>;
 def B : JoinedOrSeparate<["-"], "B">, MetaVarName<"<prefix>">,
@@ -775,11 +784,11 @@ def C : Flag<["-"], "C">, Visibility<[ClangOption, CC1Option]>,
 def D : JoinedOrSeparate<["-"], "D">, Group<Preprocessor_Group>,
     Visibility<[ClangOption, CC1Option, FlangOption, FC1Option, DXCOption]>,
     MetaVarName<"<macro>=<value>">,
-    HelpText<"Define <macro> to <value> (or 1 if <value> omitted)">;
+    HelpText<"Define a macro name to a value, '-D<macro>=<value>'. If a value is omitted, the macro is defined as 1.">;
 def E : Flag<["-"], "E">, Flags<[NoXarchOption]>,
   Visibility<[ClangOption, CC1Option, FlangOption, FC1Option]>,
   Group<Action_Group>,
-    HelpText<"Only run the preprocessor">;
+    HelpText<"Stop after pre-processing. Output the pre-processed source.">;
 def F : JoinedOrSeparate<["-"], "F">, Flags<[RenderJoined]>,
   Visibility<[ClangOption, CC1Option]>,
     HelpText<"Add directory to framework include search path">;
@@ -806,16 +815,20 @@ def I_ : Flag<["-"], "I-">, Group<I_Group>,
 def I : JoinedOrSeparate<["-"], "I">, Group<I_Group>,
     Visibility<[ClangOption, CC1Option, CC1AsOption, FlangOption, FC1Option]>,
     MetaVarName<"<dir>">,
-    HelpText<"Add directory to the end of the list of include search paths">,
+    HelpText<"Add a directory to include search path and Fortran module search path.">,
     DocBrief<[{Add directory to include search path. For C++ inputs, if
 there are multiple -I options, these directories are searched
 in the order they are given before the standard system directories
 are searched. If the same directory is in the SYSTEM include search
 paths, for example if also specified with -isystem, the -I option
-will be ignored}]>;
+will be ignored.
+
+For Fortran, search for module-files in the directories that are specified with the ``-I`` option.
+Directories that are specified with ``-I`` are searched after the current working directory and before standard system module locations.}]>;
 def L : JoinedOrSeparate<["-"], "L">, Flags<[RenderJoined]>, Group<Link_Group>,
     Visibility<[ClangOption, FlangOption]>,
-    MetaVarName<"<dir>">, HelpText<"Add directory to library search path">;
+    MetaVarName<"<dir>">,
+    HelpText<"Add a directory to the list of paths that the linker searches for user libraries.">;
 def MD : Flag<["-"], "MD">, Group<M_Group>,
     HelpText<"Write a depfile containing user and system headers">;
 def MMD : Flag<["-"], "MMD">, Group<M_Group>,
@@ -876,23 +889,25 @@ def : Flag<["-"], "fno-ident">, Group<f_Group>, Alias<Qn>,
   Visibility<[ClangOption, CLOption, DXCOption, CC1Option]>;
 def Qunused_arguments : Flag<["-"], "Qunused-arguments">,
   Flags<[NoXarchOption]>, Visibility<[ClangOption, CLOption, DXCOption]>,
-  HelpText<"Don't emit warning for unused driver arguments">;
+  HelpText<"Do not emit a warning for unused driver arguments.">;
 def Q : Flag<["-"], "Q">, IgnoredGCCCompat;
 def S : Flag<["-"], "S">, Flags<[NoXarchOption]>,
   Visibility<[ClangOption, CC1Option, FlangOption, FC1Option]>,
   Group<Action_Group>,
-  HelpText<"Only run preprocess and compilation steps">;
+  HelpText<"Stop after compiling the source and emit assembler files.">;
 def T : JoinedOrSeparate<["-"], "T">, Group<T_Group>,
   MetaVarName<"<script>">, HelpText<"Specify <script> as linker script">;
 def U : JoinedOrSeparate<["-"], "U">, Group<Preprocessor_Group>,
   Visibility<[ClangOption, CC1Option, FlangOption, FC1Option]>,
-  MetaVarName<"<macro>">, HelpText<"Undefine macro <macro>">;
+  MetaVarName<"<macro>">,
+  HelpText<"Undefine a macro, '-U<macro>'.">;
 def V : JoinedOrSeparate<["-"], "V">, Flags<[NoXarchOption, Unsupported]>;
 def Wa_COMMA : CommaJoined<["-"], "Wa,">,
   HelpText<"Pass the comma separated arguments in <arg> to the assembler">,
   MetaVarName<"<arg>">;
 def Wall : Flag<["-"], "Wall">, Group<W_Group>, Flags<[HelpHidden]>,
-  Visibility<[ClangOption, CC1Option, FlangOption]>;
+  Visibility<[ClangOption, CC1Option, FlangOption]>,
+  HelpText<"Enable all warnings.">;
 def WCL4 : Flag<["-"], "WCL4">, Group<W_Group>, Flags<[HelpHidden]>,
   Visibility<[ClangOption, CC1Option]>;
 def Wsystem_headers : Flag<["-"], "Wsystem-headers">, Group<W_Group>,
@@ -933,7 +948,7 @@ def Wno_write_strings : Flag<["-"], "Wno-write-strings">, Group<W_Group>,
   Flags<[HelpHidden]>, Visibility<[ClangOption, CC1Option]>;
 def W_Joined : Joined<["-"], "W">, Group<W_Group>,
   Visibility<[ClangOption, CC1Option, CLOption, DXCOption, FC1Option, FlangOption]>,
-  MetaVarName<"<warning>">, HelpText<"Enable the specified warning">;
+  MetaVarName<"<warning>">, HelpText<"Enable ('-W<warning>') or disable ('-Wno-<warning>') a specified warning, '<warning>'.">;
 def Xanalyzer : Separate<["-"], "Xanalyzer">,
   HelpText<"Pass <arg> to the static analyzer">, MetaVarName<"<arg>">,
   Group<StaticAnalyzer_Group>;
@@ -968,7 +983,7 @@ def z : Separate<["-"], "z">, Flags<[LinkerInput]>,
 def offload_link : Flag<["--"], "offload-link">, Group<Link_Group>,
   HelpText<"Use the new offloading linker to perform the link job.">;
 def Xlinker : Separate<["-"], "Xlinker">, Flags<[LinkerInput, RenderAsInput]>,
-  HelpText<"Pass <arg> to the linker">, MetaVarName<"<arg>">,
+  HelpText<"Pass an argument to the linker, '-Xlinker <arg>'.">, MetaVarName<"<arg>">,
   Group<Link_Group>;
 def Xoffload_linker : JoinedAndSeparate<["-"], "Xoffload-linker">,
   HelpText<"Pass <arg> to the offload linkers or the ones idenfied by -<triple>">,
@@ -1063,7 +1078,9 @@ def combine : Flag<["-", "--"], "combine">, Flags<[NoXarchOption, Unsupported]>;
 def compatibility__version : JoinedOrSeparate<["-"], "compatibility_version">;
 def config : Joined<["--"], "config=">, Flags<[NoXarchOption]>,
   Visibility<[ClangOption, CLOption, DXCOption]>, MetaVarName<"<file>">,
-  HelpText<"Specify configuration file">;
+  HelpText<"Passes the location of a configuration file to the compile command.">,
+  DocFull<[{Use a configuration file to specify a set of compile options to be run at compile time.
+The configuration file can be passed at compile time, or an environment variable can be set for it to be used for every invocation of the compiler.}]>;
 def : Separate<["--"], "config">, Alias<config>;
 def no_default_config : Flag<["--"], "no-default-config">,
   Flags<[NoXarchOption]>, Visibility<[ClangOption, CLOption, DXCOption]>,
@@ -1086,7 +1103,7 @@ def cxx_isystem : JoinedOrSeparate<["-"], "cxx-isystem">, Group<clang_i_Group>,
   MetaVarName<"<directory>">;
 def c : Flag<["-"], "c">, Flags<[NoXarchOption]>,
   Visibility<[ClangOption, FlangOption]>, Group<Action_Group>,
-  HelpText<"Only run preprocess, compile, and assemble steps">;
+  HelpText<"Stop after compiling or assembling sources and do not link. This outputs object files.">;
 defm convergent_functions : BoolFOption<"convergent-functions",
   LangOpts<"ConvergentFunctions">, DefaultFalse,
   NegFlag<SetFalse, [], [ClangOption], "Assume all functions may be convergent.">,
@@ -1722,10 +1739,12 @@ def fclasspath_EQ : Joined<["-"], "fclasspath=">, Group<f_Group>;
 def fcolor_diagnostics : Flag<["-"], "fcolor-diagnostics">, Group<f_Group>,
 
   Visibility<[ClangOption, CLOption, DXCOption, CC1Option, FlangOption, FC1Option]>,
-  HelpText<"Enable colors in diagnostics">;
+  HelpText<"Enable ('-fcolor-diagnostics') or disable ('-fno-color-diagnostics') using colors in diagnostics.">,
+  DocFull<[{The output uses ANSI escape sequences to determine the color.}]>;
 def fno_color_diagnostics : Flag<["-"], "fno-color-diagnostics">, Group<f_Group>,
   Visibility<[ClangOption, CLOption, DXCOption, FlangOption]>,
-  HelpText<"Disable colors in diagnostics">;
+  HelpText<"Enable ('-fcolor-diagnostics') or disable ('-fno-color-diagnostics') using colors in diagnostics.">,
+  DocFull<[{The output uses ANSI escape sequences to determine the color.}]>;
 def : Flag<["-"], "fdiagnostics-color">, Group<f_Group>,
   Visibility<[ClangOption, CLOption, DXCOption]>, Alias<fcolor_diagnostics>;
 def : Flag<["-"], "fno-diagnostics-color">, Group<f_Group>,
@@ -2700,7 +2719,11 @@ def fapple_link_rtlib : Flag<["-"], "fapple-link-rtlib">, Group<f_Group>,
 def flto_EQ : Joined<["-"], "flto=">,
   Visibility<[ClangOption, CLOption, CC1Option, FC1Option, FlangOption]>,
   Group<f_Group>,
-  HelpText<"Set LTO mode">, Values<"thin,full">;
+  HelpText<"Set LTO mode to either 'full' (equivalent to use '-flto') or 'thin'">, Values<"thin,full">,
+  DocFull<[{You must pass the option to both the link and compile commands.
+When LTO is enabled, compiler object files contain an intermediate representation of the original code.
+When linking the objects together into a binary at link time, the compiler performs optimizations.
+It can allow the compiler to inline functions from different files, for example.}]>;
 def flto_EQ_jobserver : Flag<["-"], "flto=jobserver">, Visibility<[ClangOption, FlangOption]>, Group<f_Group>,
   Alias<flto_EQ>, AliasArgs<["full"]>, HelpText<"Enable LTO in 'full' mode">;
 def flto_EQ_auto : Flag<["-"], "flto=auto">, Visibility<[ClangOption, FlangOption]>, Group<f_Group>,
@@ -2708,7 +2731,8 @@ def flto_EQ_auto : Flag<["-"], "flto=auto">, Visibility<[ClangOption, FlangOptio
 def flto : Flag<["-"], "flto">,
   Visibility<[ClangOption, CLOption, CC1Option, FC1Option, FlangOption]>,
   Group<f_Group>,
-  Alias<flto_EQ>, AliasArgs<["full"]>, HelpText<"Enable LTO in 'full' mode">;
+  Alias<flto_EQ>, AliasArgs<["full"]>,
+  HelpText<"Enable ('-flto') or disable ('-fno-lto' [default]) Link Time Optimizations (LTO).">;
 defm unified_lto : BoolFOption<"unified-lto",
   CodeGenOpts<"UnifiedLTO">, DefaultFalse,
   PosFlag<SetTrue, [], [ClangOption], "Use the unified LTO pipeline">,
@@ -3241,12 +3265,14 @@ def fnoopenmp_relocatable_target : Flag<["-"], "fnoopenmp-relocatable-target">,
   Visibility<[ClangOption, CC1Option]>;
 def fopenmp_simd : Flag<["-"], "fopenmp-simd">, Group<f_Group>,
   Flags<[NoArgumentUnused]>, Visibility<[ClangOption, CC1Option]>,
-  HelpText<"Emit OpenMP code only for SIMD-based constructs.">;
+  HelpText<"Enable processing of 'simd' and the 'declare simd' pragma, without "
+           "enabling OpenMP or linking in the OpenMP library, libomp. Enabled by default.">;
 def fopenmp_enable_irbuilder : Flag<["-"], "fopenmp-enable-irbuilder">, Group<f_Group>,
   Flags<[NoArgumentUnused, HelpHidden]>, Visibility<[ClangOption, CC1Option]>,
   HelpText<"Use the experimental OpenMP-IR-Builder codegen path.">;
 def fno_openmp_simd : Flag<["-"], "fno-openmp-simd">, Group<f_Group>,
-  Flags<[NoArgumentUnused]>, Visibility<[ClangOption, CC1Option]>;
+  Flags<[NoArgumentUnused]>, Visibility<[ClangOption, CC1Option]>,
+  HelpText<"Enable OpenMP and link in the OpenMP library, libomp.">;
 def fopenmp_cuda_mode : Flag<["-"], "fopenmp-cuda-mode">, Group<f_Group>,
   Flags<[NoArgumentUnused, HelpHidden]>, Visibility<[ClangOption, CC1Option]>;
 def fno_openmp_cuda_mode : Flag<["-"], "fno-openmp-cuda-mode">, Group<f_Group>,
@@ -3561,7 +3587,7 @@ def fsyntax_only : Flag<["-"], "fsyntax-only">,
   Flags<[NoXarchOption]>,
   Visibility<[ClangOption, CLOption, DXCOption, CC1Option, FC1Option, FlangOption]>,
   Group<Action_Group>,
-  HelpText<"Run the preprocessor, parser and semantic analysis stages">;
+  HelpText<"Show syntax errors but do not perform any compilation.">;
 def ftabstop_EQ : Joined<["-"], "ftabstop=">, Group<f_Group>;
 def ftemplate_depth_EQ : Joined<["-"], "ftemplate-depth=">, Group<f_Group>,
   Visibility<[ClangOption, CC1Option]>,
@@ -3951,7 +3977,8 @@ def gline_directives_only : Flag<["-"], "gline-directives-only">, Group<gN_Group
   Visibility<[ClangOption, CLOption, DXCOption, FlangOption]>,
   HelpText<"Emit debug line info directives only">;
 def gmlt : Flag<["-"], "gmlt">, Alias<gline_tables_only>;
-def g0 : Flag<["-"], "g0">, Group<gN_Group>, Visibility<[ClangOption, FlangOption]>;
+def g0 : Flag<["-"], "g0">, Group<gN_Group>, Visibility<[ClangOption, FlangOption]>,
+  HelpText<"Disable the generation of source-level debug information.">;
 def g1 : Flag<["-"], "g1">, Group<gN_Group>, Visibility<[ClangOption, FlangOption]>, Alias<gline_tables_only>;
 def g2 : Flag<["-"], "g2">, Group<gN_Group>, Visibility<[ClangOption, FlangOption]>;
 def g3 : Flag<["-"], "g3">, Group<gN_Group>, Visibility<[ClangOption, FlangOption]>;
@@ -4087,7 +4114,11 @@ def index_header_map : Flag<["-"], "index-header-map">,
   HelpText<"Make the next included directory (-I or -F) an indexer header map">;
 def idirafter : JoinedOrSeparate<["-"], "idirafter">, Group<clang_i_Group>,
   Visibility<[ClangOption, CC1Option]>,
-  HelpText<"Add directory to AFTER include search path">;
+  HelpText<"Add directory to include search path AFTER system header file directories.">,
+  DocFull<[{Directories specified with the ``-idirafter`` option apply to both the quote form of the include directive and the system header form.
+For example, #include "file" (quote form), and #include <file> (system header form).
+Directories specified with the ``-idirafter`` option are searched after system header file directories.
+Directories specified with ``-idirafter`` are treated as system directories.}]>;
 def iframework : JoinedOrSeparate<["-"], "iframework">, Group<clang_i_Group>,
   Visibility<[ClangOption, CC1Option]>,
   HelpText<"Add directory to SYSTEM framework search path">;
@@ -4122,14 +4153,23 @@ def iprefix : JoinedOrSeparate<["-"], "iprefix">, Group<clang_i_Group>,
   HelpText<"Set the -iwithprefix/-iwithprefixbefore prefix">, MetaVarName<"<dir>">;
 def iquote : JoinedOrSeparate<["-"], "iquote">, Group<clang_i_Group>,
   Visibility<[ClangOption, CC1Option]>,
-  HelpText<"Add directory to QUOTE include search path">, MetaVarName<"<directory>">;
+  HelpText<"Add directory to include search path. Directories specified with the '-iquote' option apply only to the quote form of the include directive.">,
+  DocFull<[{Directories specified with the ``-iquote`` option only apply to the quote form of the include directive, such as #include "file".
+For such directives, directories specified with ``-iquote`` are searched first, before directories specified by ``-I``.}]>,
+  MetaVarName<"<directory>">;
 def isysroot : JoinedOrSeparate<["-"], "isysroot">, Group<clang_i_Group>,
   Visibility<[ClangOption, CC1Option]>,
-  HelpText<"Set the system root directory (usually /)">, MetaVarName<"<dir>">,
+  HelpText<"For header files, set the system root directory (usually /).">, MetaVarName<"<dir>">,
   MarshallingInfoString<HeaderSearchOpts<"Sysroot">, [{"/"}]>;
 def isystem : JoinedOrSeparate<["-"], "isystem">, Group<clang_i_Group>,
   Visibility<[ClangOption, CC1Option]>,
-  HelpText<"Add directory to SYSTEM include search path">, MetaVarName<"<directory>">;
+  HelpText<"Add a directory to the include search path, before system header file directories.">,
+  DocFull<[{Directories specified with the ``-isystem`` option apply to both the quote form of the include directive and the system header form.
+For example, #include "file" (quote form), and #include <file> (system header form).
+Directories specified with the ``-isystem`` option are searched after directories specified with ``-I`` and before system header file directories.
+Directories specified with ``-isystem`` are treated as system directories.
+If any directory is specified with both ``-I`` and ``-isystem`` then the directory is searched for as if it were only specified with ``-isystem``.}]>,
+  MetaVarName<"<directory>">;
 def isystem_after : JoinedOrSeparate<["-"], "isystem-after">,
   Group<clang_i_Group>, Flags<[NoXarchOption]>, MetaVarName<"<directory>">,
   HelpText<"Add directory to end of the SYSTEM include search path">;
@@ -4153,8 +4193,10 @@ def vfsoverlay : JoinedOrSeparate<["-", "--"], "vfsoverlay">,
 def imultilib : Separate<["-"], "imultilib">, Group<gfortran_Group>;
 def K : Flag<["-"], "K">, Flags<[LinkerInput]>;
 def keep__private__externs : Flag<["-"], "keep_private_externs">;
-def l : JoinedOrSeparate<["-"], "l">, Flags<[LinkerInput, RenderJoined]>,
-        Visibility<[ClangOption, FlangOption]>, Group<Link_Group>;
+def l : JoinedOrSeparate<["-"], "l">, Flags<[LinkerInput, RenderJoined]>, MetaVarName<"<library>">,
+        Visibility<[ClangOption, FlangOption]>, Group<Link_Group>,
+  HelpText<"Search for a library when linking, '-l<library>'.">,
+  DocFull<[{Note: 'lib' is prepended to the supplied library name. For example, to search for 'libm', use ``-lm``.}]>;
 def lazy__framework : Separate<["-"], "lazy_framework">, Flags<[LinkerInput]>;
 def lazy__library : Separate<["-"], "lazy_library">, Flags<[LinkerInput]>;
 def mlittle_endian : Flag<["-"], "mlittle-endian">, Group<m_Group>,
@@ -5216,7 +5258,8 @@ def segs__read__only__addr : Separate<["-"], "segs_read_only_addr">;
 def segs__read__write__addr : Separate<["-"], "segs_read_write_addr">;
 def segs__read__ : Joined<["-"], "segs_read_">;
 def shared_libgcc : Flag<["-"], "shared-libgcc">;
-def shared : Flag<["-", "--"], "shared">, Group<Link_Group>;
+def shared : Flag<["-", "--"], "shared">, Group<Link_Group>,
+  HelpText<"Create a shared object that can be linked against.">;
 def single__module : Flag<["-"], "single_module">;
 def specs_EQ : Joined<["-", "--"], "specs=">, Group<Link_Group>;
 def specs : Separate<["-", "--"], "specs">, Flags<[Unsupported]>;
@@ -5226,11 +5269,17 @@ def start_no_unused_arguments : Flag<["--"], "start-no-unused-arguments">,
 def static_libgcc : Flag<["-"], "static-libgcc">;
 def static_libstdcxx : Flag<["-"], "static-libstdc++">;
 def static : Flag<["-", "--"], "static">, Group<Link_Group>,
-  Flags<[NoArgumentUnused]>;
+  Flags<[NoArgumentUnused]>,
+  HelpText<"Link against static libraries.">,
+  DocFull<[{This option prevents runtime dependencies on shared libraries. This is likely to result in larger binaries.}]>;
 def std_default_EQ : Joined<["-"], "std-default=">;
 def std_EQ : Joined<["-", "--"], "std=">,
   Visibility<[ClangOption, CC1Option, FlangOption, FC1Option]>,
   Group<CompileOnly_Group>, HelpText<"Language standard to compile for">,
+  DocFull<[{The list of valid standards depends on the input language of your source file.
+To view a list of supported standards, add ``-std=`` to a compile line and run the command.
+The compiler generates an error message and lists the valid arguments for your source.
+Note: You must provide a source file that the compiler can locate to generate the list of supported standards for ``-std=``.}]>,
   ValuesCode<[{
     static constexpr const char VALUES_CODE [] =
     #define LANGSTANDARD(id, name, lang, desc, features) name ","
@@ -5456,7 +5505,8 @@ def _param_EQ : Joined<["--"], "param=">, Alias<_param>;
 def _precompile : Flag<["--"], "precompile">, Flags<[NoXarchOption]>,
   Group<Action_Group>, HelpText<"Only precompile the input">;
 def _prefix_EQ : Joined<["--"], "prefix=">, Alias<B>;
-def _prefix : Separate<["--"], "prefix">, Alias<B>;
+def _prefix : Separate<["--"], "prefix">, Alias<B>,
+  HelpText<"Add <dir> to the search path for binaries and object files used implicitly.">;
 def _preprocess : Flag<["--"], "preprocess">, Alias<E>;
 def _print_diagnostic_categories : Flag<["--"], "print-diagnostic-categories">;
 def _print_file_name : Separate<["--"], "print-file-name">, Alias<print_file_name_EQ>;
@@ -5472,12 +5522,14 @@ def _serialize_diags : Separate<["-", "--"], "serialize-diagnostics">,
 // We give --version different semantics from -version.
 def _version : Flag<["--"], "version">,
   Visibility<[ClangOption, CLOption, DXCOption, FlangOption]>,
-  HelpText<"Print version information">;
+  HelpText<"Show the version number and some other basic information about the compiler.">;
 def _signed_char : Flag<["--"], "signed-char">, Alias<fsigned_char>;
 def _std : Separate<["--"], "std">, Alias<std_EQ>;
-def _stdlib : Separate<["--"], "stdlib">, Alias<stdlib_EQ>;
+def _stdlib : Separate<["--"], "stdlib">, Alias<stdlib_EQ>,
+  HelpText<"C++ standard library to use.">;
 def _target_help : Flag<["--"], "target-help">;
-def _trace_includes : Flag<["--"], "trace-includes">, Alias<H>;
+def _trace_includes : Flag<["--"], "trace-includes">, Alias<H>,
+  HelpText<"Show header includes and nesting depth.">;
 def _undefine_macro_EQ : Joined<["--"], "undefine-macro=">, Alias<U>;
 def _undefine_macro : Separate<["--"], "undefine-macro">, Alias<U>;
 def _unsigned_char : Flag<["--"], "unsigned-char">, Alias<funsigned_char>;
@@ -5492,7 +5544,8 @@ def _help_hidden : Flag<["--"], "help-hidden">,
   Visibility<[ClangOption, FlangOption]>,
   HelpText<"Display help for hidden options">;
 def _sysroot_EQ : Joined<["--"], "sysroot=">, Visibility<[ClangOption, FlangOption]>;
-def _sysroot : Separate<["--"], "sysroot">, Alias<_sysroot_EQ>;
+def _sysroot : Separate<["--"], "sysroot">, Alias<_sysroot_EQ>,
+  HelpText<"Enables the linker to treat any absolute paths found from library scripts as relative to the specified path.">;
 
 //===----------------------------------------------------------------------===//
 // pie/pic options (clang + flang-new)
